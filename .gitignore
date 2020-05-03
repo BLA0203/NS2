@@ -1,0 +1,7 @@
+/.idea/
+*.class
+*.dll
+*.exe
+*.jar
+/project_1.iml
+/NS2.iml
