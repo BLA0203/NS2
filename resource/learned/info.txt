@@ -1,0 +1,1 @@
+This folder is for export/import learned ANN, so they dont need to be trained again.
