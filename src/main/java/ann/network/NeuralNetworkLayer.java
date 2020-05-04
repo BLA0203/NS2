@@ -11,6 +11,11 @@ public class NeuralNetworkLayer {
     final boolean isFirst;
     public double bias;
     public double biasError = 0.0;
+
+    public List<Neuron> getNeurons() {
+        return neurons;
+    }
+
     List<Neuron> neurons;
 
     public NeuralNetworkLayer(boolean isOutput, boolean isFirst, List<Neuron> neurons, double bias) {

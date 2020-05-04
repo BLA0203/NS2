@@ -1,8 +1,12 @@
 package ann.network;
 
 import ann.parser.XMLParser;
+import ann.server.DriverInterface;
+import ann.server.RaceConnector;
 
+import javax.sound.midi.SysexMessage;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -22,10 +26,77 @@ public class NeuralNetwork {
     //
     private final List<TrainingItem> trainingSet;
     private final List<TestingItem> testingSet;
+
+    public List<NeuralNetworkLayer> getNeuralNetworkLayers() {
+        return neuralNetworkLayers;
+    }
+
+    public void setNeuralNetworkLayers(List<NeuralNetworkLayer> neuralNetworkLayers) {
+        this.neuralNetworkLayers = neuralNetworkLayers;
+    }
+
     //
     private List<NeuralNetworkLayer> neuralNetworkLayers;
     //
     private final List<Double> errorValues = new ArrayList<Double>();
+
+    public NeuralNetwork(XMLParser sourceData, boolean inportLearned) {
+        //Init parameters
+        this.learningRate = sourceData.learningRate;
+        this.layerCount = sourceData.layerCount;
+        this.neuronsInLayer = sourceData.neuronsInLayer;
+        this.inputNames = new ArrayList<String>(sourceData.inputNames);
+        this.outputNames = new ArrayList<String>(sourceData.outputNames);
+        this.trainingSet = sourceData.trainingSet;
+        this.testingSet = sourceData.testingSet;
+        this.inputCount = sourceData.inputCount;
+        errorValues.clear();
+        //Init Neural Network
+        this.neuralNetworkLayers = new ArrayList<NeuralNetworkLayer>();
+        for (int i = 0; i < layerCount; i++) {
+            if (i != layerCount - 1) {
+                List<Neuron> neurons = new ArrayList<Neuron>();
+                //hidden layers
+                if (i == 0) {
+                    for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
+                        Neuron neuron = new Neuron(getRandomWeights(inputCount, 0, 1));
+                        neurons.add(neuron);
+                    }
+                    NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(false, true, neurons, 0.5);
+                    this.neuralNetworkLayers.add(neuralNetworkLayer);
+                } else {
+                    for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
+                        Neuron neuron = new Neuron(getRandomWeights(neuronsInLayer.get(i - 1), 0, 1));
+                        neurons.add(neuron);
+                    }
+                    NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(false, false, neurons, 0.5);
+                    this.neuralNetworkLayers.add(neuralNetworkLayer);
+                }
+            } else {
+                List<Neuron> neurons = new ArrayList<Neuron>();
+                //output layers
+                for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
+                    Neuron neuron = new Neuron(getRandomWeights(neuronsInLayer.get(i - 1), 0, 1));
+                    neurons.add(neuron);
+                }
+                NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(true, false, neurons, 0.5);
+                this.neuralNetworkLayers.add(neuralNetworkLayer);
+            }
+        }
+        //normalize
+        for (TrainingItem tr : this.trainingSet) {
+            double divider = 0.0;
+            double[] newInputVector = new double[inputCount];
+            for (int i = 0; i < tr.getInputVector().length; i++) {
+                divider += (tr.getInputVector()[i] * tr.getInputVector()[i]);
+            }
+            divider = Math.sqrt(divider);
+            for (int i = 0; i < tr.getInputVector().length; i++) {
+                newInputVector[i] = tr.getInputVector()[i] / divider;
+            }
+            tr.setInputVector(newInputVector);
+        }
+    }
 
     //Constructor for testing, no data loaded
     public NeuralNetwork(Double learningRate, int layerCount, List<Integer> neuronsInLayer,
@@ -108,6 +179,7 @@ public class NeuralNetwork {
             }
         }
         //normalize
+        /*
         for (TrainingItem tr : this.trainingSet) {
             double divider = 0.0;
             double[] newInputVector = new double[inputCount];
@@ -120,6 +192,7 @@ public class NeuralNetwork {
             }
             tr.setInputVector(newInputVector);
         }
+        */
     }
 
     public double[] getRandomWeights(int dimension, double from, double to) {
@@ -155,6 +228,47 @@ public class NeuralNetwork {
                 break;
             }
         }
+    }
+
+    public void runRace(String host, int port, String raceName, String driverName, String carType) throws Exception {
+        RaceConnector raceConnector = null;
+        //
+        raceConnector = new RaceConnector(host, port, null);
+        System.err.println("argumenty: server port nazev_zavodu jmeno_ridice [typ_auta]");
+        List<String> raceList = raceConnector.listRaces();
+        //raceName = raceList.get(new Random().nextInt(raceList.size()));
+        List<String> carList = raceConnector.listCars(raceName);
+        //carType = carList.get(new Random().nextInt(carList.size()));
+        driverName += "_" + carType;
+        // vytvoreni klienta
+        raceConnector.setDriver(new DriverInterface() {
+
+            @Override
+            public HashMap<String, Float> drive(HashMap<String, Float> values) {
+                HashMap<String, Float> responses = new HashMap<String, Float>();
+                /*
+                float distance0 = values.get("distance0");
+                // pokud je v levo jede doprava, jinak do leva
+                if (distance0 < 0.5) {
+                    responses.put("wheel", 0.8f);
+                } else {
+                    responses.put("wheel", 0.2f);
+                }
+                // maximalni zrychleni
+                responses.put("acc", 1f);
+                */
+                double[] results = new double[0];
+                try {
+                    results = raceActivationPhase(values);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                responses.put("wheel", (float) results[0]);
+                responses.put("acc", (float) results[1]);
+                return responses;
+            }
+        });
+        raceConnector.start(raceName, driverName, carType);
     }
 
     public void testNetwork() throws Exception {
@@ -217,6 +331,41 @@ public class NeuralNetwork {
             }
         }
         //Get outputs generated by output layer
+        double[] a = neuralNetworkLayers.get(neuralNetworkLayers.size() - 1).getLayerOutputs();
+        return neuralNetworkLayers.get(neuralNetworkLayers.size() - 1).getLayerOutputs();
+    }
+
+    //GET RESULTING OUTPUT TO CONTROL CAR
+    private double[] raceActivationPhase(HashMap<String, Float> inputs) throws Exception {
+        //Convert to double vector
+        double[] inputVector = new double[inputs.size()];
+        int iterator = 0;
+        for (HashMap.Entry<String, Float> entry : inputs.entrySet()) {
+            inputVector[iterator] = entry.getValue();
+            iterator++;
+        }
+        //Calculate network output
+        for (int index = 0; index < neuralNetworkLayers.size(); index++) {
+            //if first after input...
+            if (neuralNetworkLayers.get(index).isFirst) {
+                NeuralNetworkLayer currLayer = neuralNetworkLayers.get(index);
+                for (Neuron currNeuron : currLayer.neurons) {
+                    currNeuron.setOutput(currNeuron.calculateOutput(inputVector, 1, false, currLayer.getBias()));
+                }
+            }
+            //any other layer, including last, so i need to provide inputs, which are outputs from previous layer
+            else {
+                NeuralNetworkLayer currLayer = neuralNetworkLayers.get(index);
+                double[] currInputs = neuralNetworkLayers.get(index - 1).getLayerOutputs();
+                for (Neuron currNeuron : currLayer.neurons) {
+                    if (neuralNetworkLayers.get(index).isOutput) {
+                        currNeuron.setOutput(currNeuron.calculateOutput(currInputs, 1, false, currLayer.getBias()));
+                    } else {
+                        currNeuron.setOutput(currNeuron.calculateOutput(currInputs, 1, false, currLayer.getBias()));
+                    }
+                }
+            }
+        }
         double[] a = neuralNetworkLayers.get(neuralNetworkLayers.size() - 1).getLayerOutputs();
         return neuralNetworkLayers.get(neuralNetworkLayers.size() - 1).getLayerOutputs();
     }

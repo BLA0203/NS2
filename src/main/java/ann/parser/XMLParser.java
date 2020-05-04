@@ -1,8 +1,6 @@
 package ann.parser;
 
-import ann.network.NeuralNetworkLayer;
-import ann.network.TestingItem;
-import ann.network.TrainingItem;
+import ann.network.*;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -12,6 +10,10 @@ import org.xml.sax.SAXException;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,6 +23,7 @@ public class XMLParser implements Parser {
     public Double learningRate;
     public int layerCount;
     public int inputCount;
+    public int outputCount;
     public List<Integer> neuronsInLayer;
     public List<String> inputNames;
     public List<String> outputNames;
@@ -109,6 +112,7 @@ public class XMLParser implements Parser {
                 for (int i = 0; i < outputDesList.getLength(); i++) {
                     Node currDes = outputDesList.item(i);
                     if (currDes.getNodeType() == Node.ELEMENT_NODE) {
+                        this.outputCount++;
                         this.outputNames.add(currDes.getFirstChild().getNodeValue());
                     }
                 }
@@ -146,7 +150,7 @@ public class XMLParser implements Parser {
                             else if (inputNode.getNodeName() == "outputs") {
                                 Element outputElement = (Element) inputNode;
                                 NodeList outputElementlist = outputElement.getChildNodes();
-                                double[] toAddVector = new double[4];
+                                double[] toAddVector = new double[this.outputCount];
                                 int outputInd = 0;
                                 for (int k = 0; k < outputElementlist.getLength(); k++) {
                                     Node valueNode = outputElementlist.item(k);
@@ -198,6 +202,39 @@ public class XMLParser implements Parser {
                 }
             }
         }
+    }
+
+    public void exportNeuronNetworkConfig(String path, NeuralNetwork neuralNetwork) throws Exception {
+        DocumentBuilderFactory documentFactory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder documentBuilder = documentFactory.newDocumentBuilder();
+        Document document = documentBuilder.newDocument();
+
+        Element root = document.createElement("backpropagationNeuronNet");
+        document.appendChild(root);
+
+        for (NeuralNetworkLayer currLayer : neuralNetwork.getNeuralNetworkLayers()) {
+            Element currLayerXML = document.createElement("layerInNetwork");
+            root.appendChild(currLayerXML);
+            for (Neuron currNeuron : currLayer.getNeurons()) {
+                Element currNeuronXML = document.createElement("neuron");
+                currLayerXML.appendChild(currNeuronXML);
+                for (int i = 0; i < currNeuron.getInputSize(); i++) {
+                    Element currWeightXML = document.createElement("weight");
+                    currWeightXML.appendChild(document.createTextNode(Double.toString(currNeuron.getWeightAt(i))));
+                    currNeuronXML.appendChild(currWeightXML);
+                }
+            }
+        }
+        TransformerFactory transformerFactory = TransformerFactory.newInstance();
+        Transformer transformer = transformerFactory.newTransformer();
+        DOMSource domSource = new DOMSource(document);
+        StreamResult streamResult = new StreamResult(new File(path));
+
+        transformer.transform(domSource, streamResult);
+    }
+
+    public void importNeuronNetworkConfig(String path) {
+
     }
 
 }

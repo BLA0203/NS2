@@ -144,9 +144,10 @@
     </inputDescriptions>
     <inputsCount>28</inputsCount>
     <lastStepInfluenceLearningRate>0.1</lastStepInfluenceLearningRate>
-    <layersCount>1</layersCount>
+    <layersCount>2</layersCount>
     <learningRate>0.4</learningRate>
     <neuronInLayersCount>
+        <neuronInLayerCount>8</neuronInLayerCount>
         <neuronInLayerCount>2</neuronInLayerCount>
     </neuronInLayersCount>
     <outputDescriptions>

@@ -5,3 +5,4 @@
 *.jar
 /project_1.iml
 /NS2.iml
+/resource/learned/*.xml
