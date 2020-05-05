@@ -233,8 +233,66 @@ public class XMLParser implements Parser {
         transformer.transform(domSource, streamResult);
     }
 
-    public void importNeuronNetworkConfig(String path) {
+    public void importNeuronNetworkConfig(String path, NeuralNetwork neuralNetwork) throws ParserConfigurationException, SAXException, IOException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document document = builder.parse(new File(path));
+        document.getDocumentElement().normalize();
+        Element root = document.getDocumentElement();
+        NodeList rootList = root.getChildNodes();
 
+        List<NeuralNetworkLayer> addToANN = new ArrayList<NeuralNetworkLayer>();
+
+        for (int index = 0; index < rootList.getLength(); index++) {
+            Node rootNode = rootList.item(index);
+            if (rootNode.getNodeName() == "layerInNetwork") {
+                Element currLayerElement = (Element) rootNode;
+                NodeList currLayerElementList = currLayerElement.getChildNodes();
+                List<Neuron> addListOfNeurons = new ArrayList<Neuron>();
+                NeuralNetworkLayer nLayer = new NeuralNetworkLayer(false, false, addListOfNeurons, 0.5);
+                for (int i = 0; i < currLayerElementList.getLength(); i++) {
+                    Neuron addNeuron = new Neuron();
+                    List<Double> newWeights = new ArrayList<Double>();
+                    //ONE INPUT NODE
+                    Node currLayerNode = currLayerElementList.item(i);
+                    if (currLayerNode.getNodeType() == Node.ELEMENT_NODE) {
+                        Element neuronElement = (Element) currLayerNode;
+                        NodeList neuronElementList = neuronElement.getChildNodes();
+                        for (int j = 0; j < neuronElementList.getLength(); j++) {
+                            //List<Double> newWeights = new ArrayList<Double>();
+                            Node weightElement = neuronElementList.item(j);
+                            if (weightElement.getNodeName() == "weight") {
+                                Element currWElement = (Element) weightElement;
+                                NodeList currWElementList = currWElement.getChildNodes();
+                                for (int k = 0; k < currWElementList.getLength(); k++) {
+                                    Node nodeValue = currWElementList.item(k);
+                                    double add = Double.parseDouble(nodeValue.getNodeValue());
+                                    newWeights.add(add);
+                                    //neuralNetwork.getNeuralNetworkLayers().get(i).getNeurons().get(j).setWeightAt(add, k);
+                                }
+                                double[] addWeights = new double[newWeights.size()];
+                                for (int it = 0; it < addWeights.length; it++) {
+                                    addWeights[it] = newWeights.get(it);
+                                }
+                                addNeuron.setWeights(addWeights);
+                            }
+                        }
+                        addListOfNeurons.add(addNeuron);
+                    }
+                }
+                nLayer.setNeurons(addListOfNeurons);
+                addToANN.add(nLayer);
+            }
+        }
+
+        //add to existing neuralnet
+        for (int l = 0; l < neuralNetwork.getNeuralNetworkLayers().size(); l++) {
+            for (int n = 0; n < neuralNetwork.getNeuralNetworkLayers().get(l).getNeurons().size(); n++) {
+                for (int w = 0; w < neuralNetwork.getNeuralNetworkLayers().get(l).getNeurons().get(n).getInputSize(); w++) {
+                    neuralNetwork.getNeuralNetworkLayers().get(l).getNeurons().get(n).setWeightAt(addToANN.get(l).getNeurons().get(n).getWeightAt(w), w);
+                }
+            }
+        }
     }
 
 }

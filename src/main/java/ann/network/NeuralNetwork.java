@@ -4,7 +4,6 @@ import ann.parser.XMLParser;
 import ann.server.DriverInterface;
 import ann.server.RaceConnector;
 
-import javax.sound.midi.SysexMessage;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +12,7 @@ import java.util.Random;
 /**
  * This class does all work for artificial neural network - learning and testing
  * Contains all parameters necessary for correct initialization after training and test set loading
- * Configuration along with trained ANN (weights) can be exported and reinitialized if needed
+ * Configuration along with trained ANN (weights) can be exported and imported, so there is no repeated need for training
  */
 public class NeuralNetwork {
     boolean learned = false;
@@ -39,64 +38,6 @@ public class NeuralNetwork {
     private List<NeuralNetworkLayer> neuralNetworkLayers;
     //
     private final List<Double> errorValues = new ArrayList<Double>();
-
-    public NeuralNetwork(XMLParser sourceData, boolean inportLearned) {
-        //Init parameters
-        this.learningRate = sourceData.learningRate;
-        this.layerCount = sourceData.layerCount;
-        this.neuronsInLayer = sourceData.neuronsInLayer;
-        this.inputNames = new ArrayList<String>(sourceData.inputNames);
-        this.outputNames = new ArrayList<String>(sourceData.outputNames);
-        this.trainingSet = sourceData.trainingSet;
-        this.testingSet = sourceData.testingSet;
-        this.inputCount = sourceData.inputCount;
-        errorValues.clear();
-        //Init Neural Network
-        this.neuralNetworkLayers = new ArrayList<NeuralNetworkLayer>();
-        for (int i = 0; i < layerCount; i++) {
-            if (i != layerCount - 1) {
-                List<Neuron> neurons = new ArrayList<Neuron>();
-                //hidden layers
-                if (i == 0) {
-                    for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
-                        Neuron neuron = new Neuron(getRandomWeights(inputCount, 0, 1));
-                        neurons.add(neuron);
-                    }
-                    NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(false, true, neurons, 0.5);
-                    this.neuralNetworkLayers.add(neuralNetworkLayer);
-                } else {
-                    for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
-                        Neuron neuron = new Neuron(getRandomWeights(neuronsInLayer.get(i - 1), 0, 1));
-                        neurons.add(neuron);
-                    }
-                    NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(false, false, neurons, 0.5);
-                    this.neuralNetworkLayers.add(neuralNetworkLayer);
-                }
-            } else {
-                List<Neuron> neurons = new ArrayList<Neuron>();
-                //output layers
-                for (int count = 0; count < this.neuronsInLayer.get(i); count++) {
-                    Neuron neuron = new Neuron(getRandomWeights(neuronsInLayer.get(i - 1), 0, 1));
-                    neurons.add(neuron);
-                }
-                NeuralNetworkLayer neuralNetworkLayer = new NeuralNetworkLayer(true, false, neurons, 0.5);
-                this.neuralNetworkLayers.add(neuralNetworkLayer);
-            }
-        }
-        //normalize
-        for (TrainingItem tr : this.trainingSet) {
-            double divider = 0.0;
-            double[] newInputVector = new double[inputCount];
-            for (int i = 0; i < tr.getInputVector().length; i++) {
-                divider += (tr.getInputVector()[i] * tr.getInputVector()[i]);
-            }
-            divider = Math.sqrt(divider);
-            for (int i = 0; i < tr.getInputVector().length; i++) {
-                newInputVector[i] = tr.getInputVector()[i] / divider;
-            }
-            tr.setInputVector(newInputVector);
-        }
-    }
 
     //Constructor for testing, no data loaded
     public NeuralNetwork(Double learningRate, int layerCount, List<Integer> neuronsInLayer,
@@ -135,7 +76,7 @@ public class NeuralNetwork {
     }
 
     //Standard constructor (xml file source)
-    public NeuralNetwork(XMLParser sourceData) {
+    public NeuralNetwork(XMLParser sourceData, boolean car) {
         //Init parameters
         this.learningRate = sourceData.learningRate;
         this.layerCount = sourceData.layerCount;
@@ -179,20 +120,20 @@ public class NeuralNetwork {
             }
         }
         //normalize
-        /*
-        for (TrainingItem tr : this.trainingSet) {
-            double divider = 0.0;
-            double[] newInputVector = new double[inputCount];
-            for (int i = 0; i < tr.getInputVector().length; i++) {
-                divider += (tr.getInputVector()[i] * tr.getInputVector()[i]);
+        if (!car) {
+            for (TrainingItem tr : this.trainingSet) {
+                double divider = 0.0;
+                double[] newInputVector = new double[inputCount];
+                for (int i = 0; i < tr.getInputVector().length; i++) {
+                    divider += (tr.getInputVector()[i] * tr.getInputVector()[i]);
+                }
+                divider = Math.sqrt(divider);
+                for (int i = 0; i < tr.getInputVector().length; i++) {
+                    newInputVector[i] = tr.getInputVector()[i] / divider;
+                }
+                tr.setInputVector(newInputVector);
             }
-            divider = Math.sqrt(divider);
-            for (int i = 0; i < tr.getInputVector().length; i++) {
-                newInputVector[i] = tr.getInputVector()[i] / divider;
-            }
-            tr.setInputVector(newInputVector);
         }
-        */
     }
 
     public double[] getRandomWeights(int dimension, double from, double to) {
@@ -246,17 +187,6 @@ public class NeuralNetwork {
             @Override
             public HashMap<String, Float> drive(HashMap<String, Float> values) {
                 HashMap<String, Float> responses = new HashMap<String, Float>();
-                /*
-                float distance0 = values.get("distance0");
-                // pokud je v levo jede doprava, jinak do leva
-                if (distance0 < 0.5) {
-                    responses.put("wheel", 0.8f);
-                } else {
-                    responses.put("wheel", 0.2f);
-                }
-                // maximalni zrychleni
-                responses.put("acc", 1f);
-                */
                 double[] results = new double[0];
                 try {
                     results = raceActivationPhase(values);
@@ -339,11 +269,10 @@ public class NeuralNetwork {
     private double[] raceActivationPhase(HashMap<String, Float> inputs) throws Exception {
         //Convert to double vector
         double[] inputVector = new double[inputs.size()];
-        int iterator = 0;
-        for (HashMap.Entry<String, Float> entry : inputs.entrySet()) {
-            inputVector[iterator] = entry.getValue();
-            iterator++;
+        for (int i = 0; i < this.inputNames.size(); i++) {
+            inputVector[i] = inputs.get(this.inputNames.get(i));
         }
+
         //Calculate network output
         for (int index = 0; index < neuralNetworkLayers.size(); index++) {
             //if first after input...
@@ -409,7 +338,7 @@ public class NeuralNetwork {
                 for (int neuronIndex = 0; neuronIndex < currLayer.neurons.size(); neuronIndex++) {
                     //For each neuron i need to calculate derivative error
                     Neuron currN = currLayer.neurons.get(neuronIndex);
-                    double currError = (currTrainingItem.getOutputVector()[neuronIndex] - currN.getOutput()) * transfer_derivate(currN.getOutput());
+                    double currError = (currTrainingItem.getOutputVector()[neuronIndex] - currN.getOutput()) * transfer_derivative(currN.getOutput());
                     currN.setError(currError);
                 }
             } else {
@@ -453,7 +382,7 @@ public class NeuralNetwork {
         return output;
     }
 
-    private double transfer_derivate(double output) {
+    private double transfer_derivative(double output) {
         return output * (1.0 - output);
     }
 

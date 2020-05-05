@@ -16,6 +16,10 @@ public class NeuralNetworkLayer {
         return neurons;
     }
 
+    public void setNeurons(List<Neuron> neurons) {
+        this.neurons = neurons;
+    }
+
     List<Neuron> neurons;
 
     public NeuralNetworkLayer(boolean isOutput, boolean isFirst, List<Neuron> neurons, double bias) {

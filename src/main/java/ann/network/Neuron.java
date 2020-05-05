@@ -6,6 +6,10 @@ import ann.network.transferFunction.TransferFunction;
 
 import java.util.Random;
 
+/**
+ * This class represents single neuron, which is part of layer
+ * It contains weights, current output - for next layer as input, error for calculation (adaption phase)
+ */
 public class Neuron {
     private double[] weights;
     private double output;
@@ -14,6 +18,11 @@ public class Neuron {
     //
     private TransferFunction transferFunction;
     private TransferFunction hiddenTransferFuction;
+
+    public Neuron() {
+        this.transferFunction = new LogSigmoidTF();
+        this.hiddenTransferFuction = new ReLUTF();
+    }
 
     //Testing constructor - using sigmoid
     public Neuron(int weightVectorSize) {
@@ -114,6 +123,14 @@ public class Neuron {
 
     public void setError(double error) {
         this.error = error;
+    }
+
+    public double[] getWeights() {
+        return weights;
+    }
+
+    public void setWeights(double[] weights) {
+        this.weights = weights;
     }
 
 }
